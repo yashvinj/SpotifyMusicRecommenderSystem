@@ -20,6 +20,13 @@ for each genre to be suitable for training. We will use this 3000 song set for o
 model building and analysis for popularity classification and genre classification. This
 3000 song subset now has each genre equally represented.
 
+The feature selection method we used for
+this problem was recursive feature elimination (RFE). It is a backwards selection
+method that functions by recursively removing features and building models on those
+that remain. It uses the cross-validated model accuracy to identify which combination
+of features contribute the most to predicting the target attribute.Here, the RFE
+procedure suggests that using the top 7 features in the dataset.
+
 ## Results
 1. Popularity classification: Random forest, ~76% accurate
 2. Genre classification: Random forest, ~95% accurate
