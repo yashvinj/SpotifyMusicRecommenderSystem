@@ -32,3 +32,7 @@ procedure suggests that using the top 7 features in the dataset.
 2. Genre classification: Random forest, ~95% accurate
 3. Current day popularity: Multiple regression, R2 ~0.33
 4. UBCF’s accuracy is higher than that of IBCF
+
+## Limitations
+
+The project could be improved by using more ensemble learning methods. Similarly, additional genres or multiple genre classification could have been implemented using the decision tree methods. This would enable for more flexible testing of contemporary songs to estimate their chance of becoming a hit.
