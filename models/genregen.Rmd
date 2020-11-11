@@ -1,0 +1,44 @@
+---
+title: "genre_Dataset_gen"
+author: "Yashvin Jagarlamudi"
+date: "7/19/2020"
+output: word_document
+---
+
+library(ggplot2) 
+library(tidyverse) 
+library(data.table) 
+library(modelr) 
+library(RColorBrewer) 
+library(lubridate) 
+library(rpart) 
+library("splitstackshape") 
+
+table_f<-fread("genre_music.csv") 
+memory.limit(size=56000) 
+music_tibble<-as_data_frame(table_f) 
+head(music_tibble) 
+
+set.seed(1)  
+under_sampled_music <- stratified(music_tibble, "genre", 500, select = list(genre = c("rap", "pop","r&b", "edm","latin", "rock")))  
+under_sampled_music 
+
+set.seed(1) 
+df<-under_sampled_music[,c(3,4,8,13,14,20)] 
+colnames(df) 
+
+library(rpart.plot) 
+
+set.seed(1111) 
+model_dt <- rpart(genre ~ ., data = df) 
+ 
+rpart.plot(model_dt,  
+           type = 5,  
+           extra = 104, 
+            leaf.round = 0, 
+            fallen.leaves = FALSE,  
+           branch = 0.3,  
+           under = TRUE, 
+            under.col = 'grey40', 
+            main = 'Genre Decision Tree', 
+            tweak = 1.2) 

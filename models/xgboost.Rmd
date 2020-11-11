@@ -1,0 +1,365 @@
+---
+title: "spotifyproject"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(data.table)
+library(modelr)
+library(RColorBrewer)
+library(lubridate)
+
+```
+
+```{r}
+getwd()
+setwd("C://Users//yashv//OneDrive//Desktop//spotifyproject")
+table_f<-fread("genre_music.csv")
+memory.limit(size=56000)
+
+```
+
+```{r}
+music_tibble<-as_data_frame(table_f)
+head(music_tibble)
+```
+
+```{r}
+decades_list<-c("60s", "70s", "80s", "90s", "00s", "10s")
+```
+
+```{r}
+library("splitstackshape")
+set.seed(1) 
+under_sampled_music <- stratified(music_tibble, "genre", 500, select = list(genre = c("rap", "pop","r&b", "edm","latin", "rock"))) 
+under_sampled_music
+
+```
+
+```{r}
+
+set.seed(1)
+df<-under_sampled_music[,c(-1,-2,-20)]
+colnames(df)
+```
+
+
+```{r}
+library("xgboost")
+
+df_popularity_removed<- df %>%
+  select(-starts_with("popularity"))
+
+df_popularity_removed
+```
+
+
+```{r}
+df_labels <- df$popularity # get the column with the # of humans affected
+     # switch TRUE and FALSE (using function from the magrittr package)
+
+# check out the first few lines
+head(df_labels) # of our target variable
+length(df_labels)
+```
+
+```{r}
+df_matrix <- data.matrix(df_popularity_removed)
+df_matrix_with_popularity<- data.matrix(df)
+numberOfTrainingSamples <- round(length(df_labels) * 0.7)
+numberOfTrainingSamples
+```
+
+```{r}
+train_data <- df_matrix[1:numberOfTrainingSamples,]
+train_labels <- df_labels[1:numberOfTrainingSamples]
+
+# testing data
+test_data <- df_matrix[-(1:numberOfTrainingSamples),]
+test_labels <- df_labels[-(1:numberOfTrainingSamples)]
+```
+
+```{r}
+dtrain <- xgb.DMatrix(data = train_data, label= train_labels)
+dtest <- xgb.DMatrix(data = test_data, label= test_labels)
+
+```
+
+```{r}
+
+model <- xgboost(data = dtrain, # the data   
+                 nround = 100, # max number of boosting iterations
+                 objective = "binary:logistic",
+                 print_every_n = 10)
+
+```
+
+```{r}
+pred <- predict(model, dtest)
+
+# get & print the classification error
+err <- mean(as.numeric(pred > 0.5) != test_labels)
+print(paste("test-error=", err))
+
+pred.resp <- ifelse(pred >= 0.5, 1, 0)
+```
+
+```{r}
+library("caret")
+
+confusionMatrix(factor(pred.resp), factor(test_labels), positive ="1")
+```
+
+```{r}
+names <- dimnames(dtrain)[[2]]
+importance_matrix <- xgb.importance(names, model=model)[0:10] # View top 20 most important features
+xgb.plot.importance(importance_matrix)
+```
+
+
+```{r}
+
+library(ROCR)
+xgb.pred <- prediction(pred, test_labels)
+xgb.perf <- performance(xgb.pred, "tpr", "fpr")
+plot(xgb.perf,
+     avg="threshold",
+     lwd=1,
+     main="ROC Curve for Popularity Classification using XGBoost",
+     print.cutoffs.at=seq(0, 1),
+     text.adj=c(-0.5, 0.5),
+     text.cex=0.5)
+```
+
+
+
+```{r}
+table_f2<-fread("spotify_current_popularity.csv")
+memory.limit(size=56000)
+music_tibble_current<-as_data_frame(table_f2)
+head(music_tibble_current)
+
+```
+
+```{r}
+library("splitstackshape")
+under_sampled_music <- stratified(music_tibble_current, "genre", 500, select = list(genre = c("rap", "pop","r&b", "edm","latin", "rock"))) 
+under_sampled_music
+```
+
+
+```{r}
+
+df<-under_sampled_music[,c(-1,-2, -4,-5,-7,-11, -12,-15,-16,-17,-18,-19,-20,-22)]
+colnames(df)
+
+```
+
+
+```{r}
+head(df)
+```
+
+
+```{r}
+df %>%
+  filter(current_popularity>67) %>%
+  count()
+  
+
+```
+
+
+```{r}
+df$current_popularity[df$current_popularity<67] <- 0
+df$current_popularity[df$current_popularity>=67] <- 1
+```
+
+```{r}
+library("xgboost")
+
+df_popularity_removed<- df %>%
+  select(-starts_with("current_popularity"))
+
+df_popularity_removed
+```
+
+
+```{r}
+df_labels <- df$current_popularity 
+head(df_labels) # of our target variable
+length(df_labels)
+
+```
+
+```{r}
+
+df_matrix <- data.matrix(df_popularity_removed)
+df_matrix_with_popularity<- data.matrix(df)
+numberOfTrainingSamples <- round(length(df_labels) * 0.7)
+numberOfTrainingSamples
+```
+```{r}
+train_data <- df_matrix[1:numberOfTrainingSamples,]
+train_labels <- df_labels[1:numberOfTrainingSamples]
+
+# testing data
+test_data <- df_matrix[-(1:numberOfTrainingSamples),]
+test_labels <- df_labels[-(1:numberOfTrainingSamples)]
+```
+
+```{r}
+dtrain <- xgb.DMatrix(data = train_data, label= train_labels)
+dtest <- xgb.DMatrix(data = test_data, label= test_labels)
+
+
+```
+
+```{r}
+model <- xgboost(data = dtrain, # the data   
+                 nround = 100, # max number of boosting iterations
+                 objective = "binary:logistic",
+                 print_every_n = 10)
+
+```
+
+```{r}
+pred <- predict(model, dtest)
+
+# get & print the classification error
+err <- mean(as.numeric(pred > 0.5) != test_labels)
+print(paste("test-error=", err))
+
+pred.resp <- ifelse(pred >= 0.5, 1, 0)
+
+```
+
+```{r}
+library("caret")
+
+confusionMatrix(factor(pred.resp), factor(test_labels), positive ="1")
+
+```
+
+```{r}
+library(ROCR)
+xgb.pred <- prediction(pred, test_labels)
+xgb.perf <- performance(xgb.pred, "tpr", "fpr")
+plot(xgb.perf,
+     avg="threshold",
+     lwd=1,
+     main="ROC Curve for Current Popularity Classification using XGBoost",
+     print.cutoffs.at=seq(0, 1),
+     text.adj=c(-0.5, 0.5),
+     text.cex=0.5)
+```
+
+
+
+```{r}
+
+head(music_tibble_current)
+```
+
+```{r}
+library("splitstackshape")
+set.seed(1) 
+under_sampled_music <- stratified(music_tibble, "genre", 500, select = list(genre = c("rap", "pop","r&b", "edm","latin", "rock"))) 
+under_sampled_music
+```
+
+
+
+```{r}
+df<-under_sampled_music[,c(-1,-2, -4,-5,-7,-11, -12,-15,-16,-17,-18,-19)]
+colnames(df)
+
+
+```
+
+```{r}
+df$genre <- as.factor(df$genre)
+typeof(df$genre)
+```
+
+```{r}
+genres = df$genre
+label = as.integer(df$genre)-1
+df$genre = NULL
+```
+
+```{r}
+n = nrow(df)
+train.index = sample(n,floor(0.75*n))
+train.data = as.matrix(df[train.index,])
+train.label = label[train.index]
+test.data = as.matrix(df[-train.index,])
+test.label = label[-train.index]
+```
+
+
+```{r}
+xgb.train = xgb.DMatrix(data=train.data,label=train.label)
+xgb.test = xgb.DMatrix(data=test.data,label=test.label)
+```
+
+```{r}
+num_class = length(levels(genres))
+params = list(
+  booster="gbtree",
+  eta=0.001,
+  max_depth=5,
+  gamma=3,
+  subsample=0.75,
+  colsample_bytree=1,
+  objective="multi:softprob",
+  eval_metric="mlogloss",
+  num_class=num_class
+)
+
+```
+
+```{r}
+xgb.fit=xgb.train(
+  params=params,
+  data=xgb.train,
+  nrounds=100,
+  nthreads=1,
+  early_stopping_rounds=10,
+  watchlist=list(val1=xgb.train,val2=xgb.test),
+  verbose=0
+)
+
+```
+
+```{r}
+xgb.pred = predict(xgb.fit,test.data,reshape=T)
+xgb.pred = as.data.frame(xgb.pred)
+colnames(xgb.pred) = levels(genres)
+```
+
+
+```{r}
+
+xgb.pred$label = levels(genres)[test.label+1]
+```
+
+```{r}
+result = sum(xgb.pred$prediction==xgb.pred$label)/nrow(xgb.pred)
+print(paste("Final Accuracy =",sprintf("%1.2f%%", 100*result)))
+
+```
+
+```{r}
+library("caret")
+
+confusionMatrix(factor(xgb.pred$prediction), factor(xgb.pred$label), positive ="1")
+```
